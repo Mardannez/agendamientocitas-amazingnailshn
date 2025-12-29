@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, Check, User, Scissors, ChevronLeft, Star, Sparkles, MapPin, Phone, Wand2, X, Mail, Loader2, AlertCircle, Image, PlusSquare } from 'lucide-react';
-import logoimg from './img/Logo.png';
+import logoimg from './img/LogoTransparente.png';
 // --- CONFIGURACIÓN DE EMAILJS (REEMPLAZA ESTOS VALORES) ---
 // Regístrate gratis en https://www.emailjs.com/ para obtener estos datos
 const EMAILJS_SERVICE_ID = "service_9fnrr6p";   // Ej: "service_gmail" 
@@ -596,7 +596,7 @@ export default function App() {
   const [aiError, setAiError] = useState('');
 
   const availableDays = getNextDays();
-  const apiKey = ""; // Inyectada por el entorno
+  const apiKey = "AIzaSyD3Euxfow7eIEEygMimjVxxswHs_RlAihc"; // Inyectada por el entorno
 
   // Función para calcular el costo total
   const totalCost = useMemo(() => {
@@ -609,38 +609,50 @@ export default function App() {
   // Función para generar una imagen (Implementación con API)
   const generateImage = async (prompt) => {
     // Implementación con retroceso exponencial (Exponential Backoff)
-    const fetchWithRetry = async (url, options, retries = 3, backoff = 1000) => {
-        try {
-          const response = await fetch(url, options);
-          if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-          return await response.json();
-        } catch (error) {
-          if (retries > 0) {
-            await new Promise(r => setTimeout(r, backoff));
-            return fetchWithRetry(url, options, retries - 1, backoff * 2);
-          }
-          throw error;
+      const fetchWithRetry = async (url, options, retries = 3, backoff = 1000) => {
+      try {
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+          const errText = await response.text(); // <-- CLAVE
+          throw new Error(`HTTP ${response.status} - ${errText}`);
         }
+
+        return await response.json();
+      } catch (error) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, backoff));
+          return fetchWithRetry(url, options, retries - 1, backoff * 2);
+        }
+        throw error;
+      }
     };
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
 
+    //const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+    const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict";
     // Parámetros para generar una imagen de alta calidad, realista y vertical (3:4)
-    const payload = { 
-        instances: [{ prompt: prompt }], 
-        parameters: { 
-            "sampleCount": 1,
-            "aspectRatio": "3:4" 
-        } 
+      const payload = {
+      instances: [{ prompt }],
+      parameters: { sampleCount: 1, aspectRatio: "3:4" }
     };
 
     try {
-        const result = await fetchWithRetry(apiUrl, {
+        /*const result = await fetchWithRetry(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
-        });
-        
+        });*/
+
+        const result = await fetchWithRetry(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+              
         if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
             const base64Data = result.predictions[0].bytesBase64Encoded;
             return `data:image/png;base64,${base64Data}`;
@@ -864,9 +876,9 @@ export default function App() {
            <img
               src={logoimg}
               alt="Logo"
-              className="w-32 h-32 object-contain"
+              className="w-25 h-25 object-contain"
            />
-            <span className="font-serif text-xl font-bold text-gray-800 tracking-tight">Amazing Nails</span>
+            <span className="font-serif text-xl font-bold text-gray-800 tracking-tight">Agendamiento</span>
           </div>
           {step < 4 && (
             <div className="flex items-center gap-1">
@@ -920,7 +932,8 @@ export default function App() {
 
       <footer className="text-center text-gray-400 text-sm py-8">
         <p className="flex items-center justify-center gap-1">
-          <MapPin size={14} /> Calle Vicente Wiliams, Plaza Isabelle, contiguo a Bac Credomatic
+          <MapPin size={14} /> Barrio el Centro, calle Vicente Williams, Plaza Isabelle
+                                Choluteca, Choluteca
         </p>
         <p className="mt-2">© {new Date().getFullYear()} Amazing Nails Nail Care Studio</p>
       </footer>
