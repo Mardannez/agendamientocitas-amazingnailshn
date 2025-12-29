@@ -596,7 +596,7 @@ export default function App() {
   const [aiError, setAiError] = useState('');
 
   const availableDays = getNextDays();
-  const apiKey = "AIzaSyD3Euxfow7eIEEygMimjVxxswHs_RlAihc"; // Inyectada por el entorno
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;; // Inyectada por el entorno
 
   // Función para calcular el costo total
   const totalCost = useMemo(() => {
@@ -694,9 +694,34 @@ export default function App() {
       const fetchWithRetry = async (url, options, retries = 3, backoff = 1000) => {
         try {
           const response = await fetch(url, options);
-          if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-          return await response.json();
+
+          // Lee el body UNA sola vez
+          const raw = await response.text();
+
+          // Intenta parsear JSON
+          let data;
+          try {
+            data = raw ? JSON.parse(raw) : null;
+          } catch {
+            data = raw; // si no es JSON, dejamos texto
+          }
+
+          if (!response.ok) {
+            // No reintentes errores de permisos / payload
+            if ([400, 401, 403].includes(response.status)) {
+              throw new Error(`Error HTTP: ${response.status} - ${raw}`);
+            }
+            // Solo reintenta 429 o 5xx
+            if (retries > 0 && (response.status === 429 || response.status >= 500)) {
+              await new Promise(r => setTimeout(r, backoff));
+              return fetchWithRetry(url, options, retries - 1, backoff * 2);
+            }
+            throw new Error(`Error HTTP: ${response.status} - ${raw}`);
+          }
+
+          return data;
         } catch (error) {
+          // errores de red
           if (retries > 0) {
             await new Promise(r => setTimeout(r, backoff));
             return fetchWithRetry(url, options, retries - 1, backoff * 2);
@@ -705,12 +730,16 @@ export default function App() {
         }
       };
 
+
       // 1. Generar la sugerencia de texto
       const textData = await fetchWithRetry(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": apiKey,
+                  },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
             systemInstruction: { parts: [{ text: systemPromptText }] }
