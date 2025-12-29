@@ -596,7 +596,7 @@ export default function App() {
   const [aiError, setAiError] = useState('');
 
   const availableDays = getNextDays();
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;; // Inyectada por el entorno
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // Inyectada por el entorno
 
   // Función para calcular el costo total
   const totalCost = useMemo(() => {
