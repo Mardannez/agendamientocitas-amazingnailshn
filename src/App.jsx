@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Clock, Check, User, Scissors, ChevronLeft, Star, Sparkles, MapPin, Phone, Wand2, X, Mail, Loader2, AlertCircle, Image, PlusSquare } from 'lucide-react';
 import logoimg from './img/LogoTransparente.png';
+import { createBooking2 } from './api/bookings2';
+import { getServices } from "./api/services";
 // --- CONFIGURACIÓN DE EMAILJS (REEMPLAZA ESTOS VALORES) ---
 // Regístrate gratis en https://www.emailjs.com/ para obtener estos datos
 const EMAILJS_SERVICE_ID = "service_9fnrr6p";   // Ej: "service_gmail" 
@@ -13,27 +15,27 @@ const CURRENCY_SYMBOL = "L"; // Símbolo de Lempira Hondureño (HNL)
 
 
 // Servicios actualizados según la imagen y descripciones investigadas
-const SERVICES = [
+/*const SERVICES = [
   {
-    id: 1,
+    id: "0f4c473b-4803-4565-98ec-595ece933ccf",
     name: "Manicura Rusa + Semipermanente",
-    price: 300,
-    duration: "90 min",
+    price: 350,
+    duration: "60 min",
     description: "Técnica de limpieza profunda de cutículas con torno (fresa) para una base impecable y esmaltado de gel de larga duración.",
     color: "bg-rose-100",
     isAddon: false
   },
   {
-    id: 2,
+    id: "3b2269d5-7028-4d3f-9e22-1464e07c0613",
     name: "Calcio + Semipermanente",
     price: 400,
-    duration: "75 min",
+    duration: "120 min",
     description: "Aplicación de una base de calcio fortalecedora bajo el esmalte semipermanente, ideal para uñas débiles o quebradizas.",
     color: "bg-purple-100",
     isAddon: false
   },
   {
-    id: 3,
+    id: "e1a986a0-369d-47b7-b418-bb5796911828",
     name: "Reforzamiento + Nivelación + Semipermanente",
     price: 550,
     duration: "120 min",
@@ -42,10 +44,10 @@ const SERVICES = [
     isAddon: false
   },
   {
-    id: 4,
+    id: "b0bc6707-c4b1-49d3-948d-62702f0199f6",
     name: "Esculturales Híbridas con Polygel",
     price: 700,
-    duration: "150 min",
+    duration: "120 min",
     description: "Creación de extensiones de uñas (sin tip) usando Polygel, un material ligero y resistente, para un look más natural y duradero.",
     color: "bg-teal-100",
     isAddon: false
@@ -78,9 +80,46 @@ const SERVICES = [
     color: "bg-gray-100",
     isAddon: true
   }
-];
+];*/
 
-// Horarios de 9:00 a 18:00 (6 PM)
+//Quitamos los servicios en duro y solo dejamos los addons
+
+
+// ✅ Addons se quedan fijos por ahora
+const ADDONS = [
+  {
+    id: 5,
+    name: "Tratamiento con Vitamina E",
+    price: 100,
+    duration: "15 min",
+    description: "Tratamiento de hidratación intensiva para cutículas y piel, promoviendo uñas saludables.",
+    color: "bg-amber-100",
+    isAddon: true
+  },
+  {
+    id: 6,
+    name: "Cada diseño adicional",
+    price: 50,
+    duration: "15 min",
+    description: "Costo por diseño complejo o extra en uñas individuales (ej. mano alzada, pedrería).",
+    color: "bg-cyan-100",
+    isAddon: true
+  },
+  {
+    id: 7,
+    name: "Retirado de material",
+    price: 100,
+    duration: "30 min",
+    description: "Remoción segura de esmalte semipermanente, acrílico o gel, para evitar dañar la uña natural.",
+    color: "bg-gray-100",
+    isAddon: true
+  }
+];
+const SERVICE_COLORS = ["bg-rose-100", "bg-purple-100", "bg-pink-100", "bg-teal-100", "bg-amber-100"];
+
+
+
+// Horarios de 9:00 a 18:00 (6 PM) -- esto solo va cuando quiero representar datos sin
 const TIME_SLOTS = [
   "09:00", "10:00", "11:00", "12:00", 
   "13:00", "14:00", "15:00", "16:00", 
@@ -90,18 +129,30 @@ const TIME_SLOTS = [
 const getNextDays = () => {
   const days = [];
   const today = new Date();
-  for (let i = 0; i < 15; i++) {
+
+  for (let i = 0; i < 10; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
+
+    const dateISO = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+
     days.push({
       fullDate: date,
-      dayName: date.toLocaleDateString('es-ES', { weekday: 'short' }),
+      dayName: date.toLocaleDateString("es-ES", { weekday: "short" }),
       dayNumber: date.getDate(),
-      month: date.toLocaleDateString('es-ES', { month: 'short' })
+      month: date.toLocaleDateString("es-ES", { month: "short" }),
+      dateISO,
     });
   }
+
   return days;
 };
+
+
 
 // SVG del logo (flor/mariposa) basado en la imagen
 const LogoSVG = ({ className = "w-6 h-6" }) => (
@@ -223,9 +274,10 @@ const AiAssistantCard = ({
 };
 
 // Se agregó 'setStep' a los props para poder avanzar al paso 2.
-const StepServices = ({ handleServiceSelect, showAiAssistant, setShowAiAssistant, aiProps, bookingData, setBookingData, setStep }) => {
-  const mainServices = SERVICES.filter(s => !s.isAddon);
-  const addOns = SERVICES.filter(s => s.isAddon);
+//Paso 1: Seleccionar Servicio Principal
+const StepServices = ({ mainServices, addOns, handleServiceSelect, showAiAssistant, setShowAiAssistant, aiProps, bookingData, setBookingData, setStep }) => {
+  //const mainServices = SERVICES.filter(s => !s.isAddon);
+  //const addOns = SERVICES.filter(s => s.isAddon);
   
   // Manejador para seleccionar/deseleccionar un servicio adicional
   const handleAddonToggle = (addon) => {
@@ -248,6 +300,7 @@ const StepServices = ({ handleServiceSelect, showAiAssistant, setShowAiAssistant
 
   return (
     <div className="animate-fade-in">
+     
       <h2 className="text-2xl font-serif font-bold text-gray-800 mb-2">1. Elige tu servicio principal</h2>
       <p className="text-gray-500 mb-6">Selecciona la base de tu manicura. Luego podrás agregar extras.</p>
       
@@ -346,14 +399,62 @@ const StepServices = ({ handleServiceSelect, showAiAssistant, setShowAiAssistant
     </div>
   );
 };
-//Paso 2
-const StepDateTime = ({ setStep, availableDays, handleDateTimeSelect }) => {
-  const [selectedDate, setSelectedDate] = useState(null);
+//Paso 2: Seleccionar el dia y la hora
+const StepDateTime = ({ setStep, availableDays, handleDateTimeSelect, serviceId }) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
   
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [dateISO, setDateISO] = useState("");
+  const [hours, setHours] = useState([]);
+  const [loadingHours, setLoadingHours] = useState(false);
+  const [hoursError, setHoursError] = useState("");
+
+    const toISODate = (d) => {
+      // d puede ser Date o string YYYY-MM-DD
+      if (!d) return "";
+      if (typeof d === "string") return d;
+
+      return [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+      ].join("-");
+    };
+
+  const loadAvailability = async (day) => {
+    if (!serviceId) {
+      setHours([]);
+      setHoursError("Primero selecciona un servicio.");
+      return;
+    }
+
+    const iso = toISODate(day.fullDate);
+    setDateISO(iso);
+    setHoursError("");
+    setLoadingHours(true);
+
+    try {
+      const url = `${API_BASE_URL}/availability?date=${encodeURIComponent(iso)}&service_id=${encodeURIComponent(serviceId)}`;
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error || "No pudimos cargar horarios.");
+      }
+
+      setHours(data?.hours ?? []);
+    } catch (err) {
+      setHours([]);
+      setHoursError(err?.message || "Error cargando horarios.");
+    } finally {
+      setLoadingHours(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in">
-      <button 
-        onClick={() => setStep(1)} 
+      <button
+        onClick={() => setStep(1)}
         className="mb-4 text-sm text-gray-500 hover:text-rose-600 flex items-center"
       >
         <ChevronLeft size={16} className="mr-1" /> Volver a servicios
@@ -363,17 +464,23 @@ const StepDateTime = ({ setStep, availableDays, handleDateTimeSelect }) => {
 
       <div className="mb-8">
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Selecciona un día</h3>
+
         <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
           {availableDays.map((day, idx) => {
-            const isSelected = selectedDate?.fullDate.toDateString() === day.fullDate.toDateString();
+            const isSelected =
+              selectedDate?.fullDate.toDateString() === day.fullDate.toDateString();
+
             return (
               <button
                 key={idx}
-                onClick={() => setSelectedDate(day)}
+                onClick={() => {
+                  setSelectedDate(day);
+                  loadAvailability(day);
+                }}
                 className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-2xl border transition-all ${
-                  isSelected 
-                    ? 'bg-rose-500 border-rose-600 text-white shadow-lg scale-105' 
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-rose-300 hover:bg-rose-50'
+                  isSelected
+                    ? "bg-rose-500 border-rose-600 text-white shadow-lg scale-105"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-rose-300 hover:bg-rose-50"
                 }`}
               >
                 <span className="text-xs font-medium uppercase mb-1">{day.dayName}</span>
@@ -384,24 +491,48 @@ const StepDateTime = ({ setStep, availableDays, handleDateTimeSelect }) => {
         </div>
       </div>
 
-      <div className={`transition-opacity duration-500 ${selectedDate ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
-        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Horarios disponibles (9:00 - 18:00)</h3>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-          {TIME_SLOTS.map((time) => (
-            <button
-              key={time}
-              onClick={() => handleDateTimeSelect(selectedDate, time)}
-              className="py-3 px-4 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-rose-500 hover:text-white hover:border-rose-600 transition-all focus:ring-2 focus:ring-rose-200"
-            >
-              {time}
-            </button>
-          ))}
-        </div>
+      <div
+        className={`transition-opacity duration-500 ${
+          selectedDate ? "opacity-100" : "opacity-30 pointer-events-none"
+        }`}
+      >
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
+          Horarios disponibles (9:00 - 18:00)
+        </h3>
+
+        {hoursError && (
+          <div className="p-3 mb-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
+            {hoursError}
+          </div>
+        )}
+
+        {loadingHours ? (
+          <div className="text-sm text-gray-500">Cargando horarios...</div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {(hours ?? []).map((h) => (
+              <button
+                key={h.start_min}
+                disabled={!h.available}
+                onClick={() => handleDateTimeSelect(selectedDate, h.time_local, dateISO)}
+                className={`py-3 px-4 rounded-xl border font-medium transition-all focus:ring-2 focus:ring-rose-200
+                  ${
+                    h.available
+                      ? "border-gray-200 text-gray-700 hover:bg-rose-500 hover:text-white hover:border-rose-600"
+                      : "border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed"
+                  }`}
+              >
+                {h.time_local}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 };
-//Paso 3
+
+//Paso 3: Confirmar cita en el formulario.
 const StepForm = ({ bookingData, setBookingData, setStep, handleSubmit, isSending, sendError, totalCost }) => (
   <div className="animate-fade-in">
     <button 
@@ -531,7 +662,7 @@ const StepForm = ({ bookingData, setBookingData, setStep, handleSubmit, isSendin
     </form>
   </div>
 );
-//Paso 4
+//Paso 4: Confirmacion exitosa de cita
 const StepSuccess = ({ bookingData, resetApp, isSimulation, totalCost }) => (
   <div className="text-center animate-fade-in py-10">
     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
@@ -556,6 +687,7 @@ const StepSuccess = ({ bookingData, resetApp, isSimulation, totalCost }) => (
       {bookingData.addOns.length > 0 && (
         <p className="text-sm text-gray-700"><span className="font-bold">Extras:</span> {bookingData.addOns.map(a => a.name).join(', ')}</p>
       )}
+      <p className="text-sm text-gray-700"><span className="font-bold">Fecha:</span> {bookingData.dateISO}</p>
       <p className="text-sm text-gray-700"><span className="font-bold">Hora:</span> {bookingData.time}</p>
       <p className="text-lg text-gray-800 font-extrabold mt-2"><span className="font-normal">Total:</span> {CURRENCY_SYMBOL}{totalCost}</p>
     </div>
@@ -581,7 +713,39 @@ export default function App() {
     clientEmail: '',
     clientPhone: ''
   });
-  
+const [mainServices, setMainServices] = useState([]);
+const [servicesLoading, setServicesLoading] = useState(true);
+const [servicesError, setServicesError] = useState("");
+
+useEffect(() => {
+  (async () => {
+    try {
+      setServicesLoading(true);
+      setServicesError("");
+
+      const apiServices = await getServices();
+
+      const onlyActive = apiServices.filter(s => s.is_active);
+
+      const mapped = onlyActive.map((s, idx) => ({
+        id: s.id,
+        name: s.name,
+        price: s.price == null ? 0 : Number(s.price), // Prisma suele devolver string
+        duration: `${s.duration_min} min`,
+        description: "", // si luego quieres, lo llenamos desde DB
+        color: SERVICE_COLORS[idx % SERVICE_COLORS.length],
+        isAddon: false,
+      }));
+
+      setMainServices(mapped);
+    } catch (err) {
+      setServicesError(err?.message || String(err));
+    } finally {
+      setServicesLoading(false);
+    }
+  })();
+}, []);
+
   // Estado de envío
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -793,34 +957,57 @@ export default function App() {
     }));
   };
 
-  const handleDateTimeSelect = (date, time) => {
-    setBookingData({ ...bookingData, date, time });
-    setStep(3);
-  };
+  const timeToStartMin = (time) => {
+  // "09:00" -> 540
+  const [hh, mm] = time.split(":").map(Number);
+  return (hh * 60) + (mm || 0);
+};
+const handleDateTimeSelect = (selectedDate, time, dateISO) => {
+  if (!selectedDate) return;
+  if (!dateISO) {
+    const d = selectedDate.fullDate;
+    dateISO = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
 
+  setBookingData((prev) => ({
+    ...prev,
+    date: selectedDate,          // UI
+    time,                        // "09:00"
+    dateISO,                     // "YYYY-MM-DD"
+    start_min: timeToStartMin(time), // ✅ para /bookings2
+  }));
+
+  setStep(3); // tu step de resumen / finalizar
+};
+
+  const EMAIL_NOTIFICATIONS_ENABLED = false; // ⛔ por ahora NO enviar EmailJS (solo reservar)
   // --- LÓGICA DE ENVÍO CON API DE EMAILJS ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSending(true);
-    setSendError('');
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsSending(true);
+  setSendError("");
 
-    // --- MODO SIMULACIÓN ---
-    if (
-      EMAILJS_SERVICE_ID.includes("service_id_aqui") || 
-      EMAILJS_PUBLIC_KEY.includes("public_key_aqui")
-    ) {
-      setTimeout(() => {
-        setIsSending(false);
-        setIsSimulation(true);
-        setStep(4);
-      }, 1500); // Pequeña demora para simular red
-      return;
-    }
+  // ========= 🔒 EmailJS (NO borrar, solo “apagado”) =========
+    // Dejo tu código intacto en una función interna.
+      const sendEmailWithEmailJS = async () => {
+      // --- MODO SIMULACIÓN (tu lógica original) ---
+      if (
+        EMAILJS_SERVICE_ID.includes("service_id_aqui") ||
+        EMAILJS_PUBLIC_KEY.includes("public_key_aqui")
+      ) {
+        // Simula éxito de envío
+        await new Promise((r) => setTimeout(r, 1500));
+        return { simulated: true };
+      }
 
-    // Formatear los addons para el correo
-    const addOnsList = bookingData.addOns.map(a => `${a.name} (${CURRENCY_SYMBOL}${a.price})`).join(', ') || 'Ninguno';
+    const addOnsList =
+      bookingData.addOns?.map((a) => `${a.name} (${CURRENCY_SYMBOL}${a.price})`).join(", ") ||
+      "Ninguno";
 
-    // Preparar parámetros para la plantilla de EmailJS
     const templateParams = {
       service_id: EMAILJS_SERVICE_ID,
       template_id: EMAILJS_TEMPLATE_ID,
@@ -831,39 +1018,82 @@ export default function App() {
         client_email: bookingData.clientEmail,
         client_phone: bookingData.clientPhone,
         service_name: bookingData.service?.name,
-        service_addons: addOnsList, // Enviar lista de addons
-        service_price: `${CURRENCY_SYMBOL}${totalCost}`, // Enviar el total
+        service_addons: addOnsList,
+        service_price: `${CURRENCY_SYMBOL}${totalCost}`,
         date_day: bookingData.date?.dayName,
         date_number: bookingData.date?.dayNumber,
         date_month: bookingData.date?.month,
-        time_slot: bookingData.time
-      }
+        time_slot: bookingData.time,
+      },
     };
 
-    try {
-      // Llamada directa a la API de EmailJS (sin librería externa)
-      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(templateParams),
-      });
+    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(templateParams),
+    });
 
-      if (response.ok) {
-        setIsSimulation(false);
-        setStep(4);
-      } else {
-        const errorData = await response.text();
-        throw new Error(errorData || "Error de conexión con el servidor de correo.");
-      }
-    } catch (error) {
-      console.error('Error al enviar el correo:', error);
-      setSendError(`No pudimos enviar el correo. Detalle: ${error.message}`);
-    } finally {
-      setIsSending(false);
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || "Error de conexión con el servidor de correo.");
     }
+
+    return { ok: true };
   };
+  // ========= /EmailJS =========
+
+  try {
+    // ✅ 1) Crear reserva en tu API (booking2)
+    // Requiere que guardes bookingData.dateISO = "YYYY-MM-DD"
+    const booking_date = bookingData.dateISO;
+    if (!booking_date) throw new Error("Falta bookingData.dateISO (YYYY-MM-DD).");
+
+    if (!bookingData.service?.id) throw new Error("Falta service_id.");
+    if (!bookingData.time) throw new Error("Falta hora seleccionada.");
+    if (!bookingData.clientName || !bookingData.clientEmail || !bookingData.clientPhone) {
+      throw new Error("Completa nombre, correo y teléfono.");
+    }
+    if (typeof bookingData.start_min !== "number") {
+       throw new Error("Falta start_min (selecciona una hora disponible).");
+       }
+    console.log("SERVICE OBJ:", bookingData.service);
+    console.log("SERVICE ID:", bookingData.service?.id, typeof bookingData.service?.id);
+    console.log("SUBMIT DATA", {
+      service_id: bookingData.service?.id,
+      booking_date: bookingData.dateISO,
+      time_local: bookingData.time,
+      clientName: bookingData.clientName,
+      clientEmail: bookingData.clientEmail,
+      clientPhone: bookingData.clientPhone,
+    });
+    
+  
+    // 👇 llama tu endpoint /bookings2
+    await createBooking2({
+      service_id: bookingData.service.id,
+      booking_date: bookingData.dateISO,                // "YYYY-MM-DD"
+      time_local: bookingData.time,  // "09:00"
+      start_min: bookingData.start_min, // ✅ usa el que ya guardaste
+      clientName: bookingData.clientName,
+      clientEmail: bookingData.clientEmail,
+      clientPhone: bookingData.clientPhone,
+    });
+
+    // ✅ 2) (opcional) EmailJS después (apagado por ahora)
+    if (EMAIL_NOTIFICATIONS_ENABLED) {
+      await sendEmailWithEmailJS();
+    }
+
+    // ✅ 3) avanzar a confirmación
+    setIsSimulation(false);
+    setStep(4);
+  } catch (error) {
+    console.error("Error en handleSubmit:", error);
+    setSendError(`No pudimos completar la reserva. Detalle: ${error.message || error}`);
+  } finally {
+    setIsSending(false);
+  }
+};
 
   const resetApp = () => {
     setBookingData({
@@ -922,6 +1152,8 @@ export default function App() {
       <main className="max-w-md mx-auto px-6 py-8">
         {step === 1 && (
           <StepServices 
+            mainServices={mainServices}
+            addOns={ADDONS}
             handleServiceSelect={handleServiceSelect}
             showAiAssistant={showAiAssistant}
             setShowAiAssistant={setShowAiAssistant}
@@ -936,6 +1168,7 @@ export default function App() {
             setStep={setStep}
             availableDays={availableDays}
             handleDateTimeSelect={handleDateTimeSelect}
+            serviceId={bookingData.service?.id}
           />
         )}
         {step === 3 && (
