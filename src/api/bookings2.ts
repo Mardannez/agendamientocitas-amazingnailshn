@@ -32,9 +32,11 @@ export async function createBooking2(input: {
   });
 
   const data = await res.json().catch(() => ({}));
-
+  // 👇 SIEMPRE imprime lo que devuelve el backend (ok o error)
+    console.log("BOOKING2 RESPONSE (status):", res.status);
+    console.log("BOOKING2 RESPONSE (data):", data);
   if (!res.ok) {
-    console.log("BOOKING2 ERROR RESPONSE:", data); // 👈 agrega esto
+    console.log("BOOKING2 ERROR RESPONSE:", data);
     throw new Error(data?.error || data?.message || JSON.stringify(data) || "Error al reservar");
   }
 

@@ -726,13 +726,13 @@ useEffect(() => {
       const apiServices = await getServices();
 
       const onlyActive = apiServices.filter(s => s.is_active);
-
+      console.log(apiServices.textData);
       const mapped = onlyActive.map((s, idx) => ({
         id: s.id,
         name: s.name,
         price: s.price == null ? 0 : Number(s.price), // Prisma suele devolver string
         duration: `${s.duration_min} min`,
-        description: "", // si luego quieres, lo llenamos desde DB
+        description: s.description, // si luego quieres, lo llenamos desde DB
         color: SERVICE_COLORS[idx % SERVICE_COLORS.length],
         isAddon: false,
       }));
@@ -841,7 +841,7 @@ useEffect(() => {
     const systemPromptText = `
       Eres una experta manicurista y estilista de uñas del salón "Amazing Nails". 
       Tu objetivo es recomendar uno de los siguientes servicios principales basándote en la descripción de la clienta:
-      ${SERVICES.filter(s => !s.isAddon).map(s => `- ${s.name}: ${s.description}`).join('\n')}
+      ${mainServices.filter(s => !s.isAddon).map(s => `- ${s.name}: ${s.description}`).join('\n')}
       
       Instrucciones:
       1. Sugiere un diseño o color específico que combine con la ocasión o mood que describe la usuaria.
@@ -992,54 +992,7 @@ const handleDateTimeSelect = (selectedDate, time, dateISO) => {
   setSendError("");
 
   // ========= 🔒 EmailJS (NO borrar, solo “apagado”) =========
-    // Dejo tu código intacto en una función interna.
-      const sendEmailWithEmailJS = async () => {
-      // --- MODO SIMULACIÓN (tu lógica original) ---
-      if (
-        EMAILJS_SERVICE_ID.includes("service_id_aqui") ||
-        EMAILJS_PUBLIC_KEY.includes("public_key_aqui")
-      ) {
-        // Simula éxito de envío
-        await new Promise((r) => setTimeout(r, 1500));
-        return { simulated: true };
-      }
 
-    const addOnsList =
-      bookingData.addOns?.map((a) => `${a.name} (${CURRENCY_SYMBOL}${a.price})`).join(", ") ||
-      "Ninguno";
-
-    const templateParams = {
-      service_id: EMAILJS_SERVICE_ID,
-      template_id: EMAILJS_TEMPLATE_ID,
-      user_id: EMAILJS_PUBLIC_KEY,
-      template_params: {
-        to_email: bookingData.clientEmail,
-        client_name: bookingData.clientName,
-        client_email: bookingData.clientEmail,
-        client_phone: bookingData.clientPhone,
-        service_name: bookingData.service?.name,
-        service_addons: addOnsList,
-        service_price: `${CURRENCY_SYMBOL}${totalCost}`,
-        date_day: bookingData.date?.dayName,
-        date_number: bookingData.date?.dayNumber,
-        date_month: bookingData.date?.month,
-        time_slot: bookingData.time,
-      },
-    };
-
-    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(templateParams),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(errorData || "Error de conexión con el servidor de correo.");
-    }
-
-    return { ok: true };
-  };
   // ========= /EmailJS =========
 
   try {
@@ -1083,7 +1036,7 @@ const handleDateTimeSelect = (selectedDate, time, dateISO) => {
     if (EMAIL_NOTIFICATIONS_ENABLED) {
       await sendEmailWithEmailJS();
     }
-
+    
     // ✅ 3) avanzar a confirmación
     setIsSimulation(false);
     setStep(4);
