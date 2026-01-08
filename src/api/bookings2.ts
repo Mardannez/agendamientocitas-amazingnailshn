@@ -40,5 +40,14 @@ export async function createBooking2(input: {
     throw new Error(data?.error || data?.message || JSON.stringify(data) || "Error al reservar");
   }
 
+
   return data;
 }
+
+export async function getBookings2ByMonth(year: number, month: number) {
+  const res = await fetch(`${API_BASE_URL}/bookings2/month?year=${year}&month=${month}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "No pude cargar citas del mes");
+  return data; // { ok, year, month, bookings: [] }
+}
+
