@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ScheduleXCalendar, useCalendarApp } from "@schedule-x/react";
 import { createViewMonthGrid, createViewWeek, createViewDay } from "@schedule-x/calendar";
 import { createEventsServicePlugin } from "@schedule-x/events-service";
-import { Link } from "react-router-dom";
 
 import "temporal-polyfill/global";
 import { Temporal } from "temporal-polyfill";
 import "@schedule-x/theme-default/dist/index.css";
+import { Link } from "react-router-dom";
 
 // helpers
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -20,9 +20,20 @@ function monthRange(dateObj) {
   return { startISO: toISODate(start), endISO: toISODate(end) };
 }
 
-// "YYYY-MM-DD" + "HH:mm" -> ZonedDateTime (Honduras)
+// ✅ "YYYY-MM-DD" + "HH:mm" -> ZonedDateTime en TZ Honduras SIN forzar -06 manual
 function toZdt(dateISO, timeHHmm, tz = "America/Tegucigalpa") {
-  return Temporal.ZonedDateTime.from(`${dateISO}T${timeHHmm}:00-06:00[${tz}]`);
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const [hour, minute] = timeHHmm.split(":").map(Number);
+
+  return Temporal.ZonedDateTime.from({
+    timeZone: tz,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second: 0,
+  });
 }
 
 function EventModal({ open, onClose, event }) {
@@ -59,9 +70,7 @@ function EventModal({ open, onClose, event }) {
             {lines.length ? (
               <div className="space-y-2">
                 {lines.map((l, idx) => (
-                  <div key={idx} className="text-sm text-gray-700">
-                    {l}
-                  </div>
+                  <div key={idx} className="text-sm text-gray-700">{l}</div>
                 ))}
               </div>
             ) : (
@@ -86,30 +95,42 @@ function EventModal({ open, onClose, event }) {
 export default function ScheduleXMonthView() {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-  // ✅ ESTOS HOOKS VAN AQUÍ (NO afuera)
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const eventsService = useMemo(() => createEventsServicePlugin(), []);
+
+  const calendar = useCalendarApp({
+    views: [createViewMonthGrid(), createViewWeek(), createViewDay()],
+    defaultView: "monthGrid",
+    events: [],
+
+    // ✅ 1) Timezone del calendario (si no, queda en UTC)
+    timezone: "America/Tegucigalpa",
+
+    // ✅ 2) Mostrar SOLO tu horario de trabajo en Week/Day
+    dayBoundaries: { start: "09:00", end: "18:00" },
+
+    // (opcional) mejor formato del eje horario
+    weekOptions: {
+      gridStep: 60, // horas exactas
+      timeAxisFormatOptions: { hour: "2-digit", minute: "2-digit" },
+    },
+
+    callbacks: {
+      onEventClick: (calendarEvent) => {
+        setSelectedEvent(calendarEvent);
+        setIsModalOpen(true);
+      },
+    },
+
+    plugins: [eventsService],
+  });
 
   const [cursorDate, setCursorDate] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [count, setCount] = useState(0);
-
-  const eventsService = useMemo(() => createEventsServicePlugin(), []);
-
-  // ✅ Mejor: usar callbacks onEventClick (más compatible)
-  const calendar = useCalendarApp({
-    views: [createViewMonthGrid(), createViewWeek(), createViewDay()],
-    defaultView: "monthGrid",
-    events: [], // ✅ evita "events.forEach is not a function"
-    plugins: [eventsService],
-    callbacks: {
-      onEventClick: (evt) => {
-        setSelectedEvent(evt);
-        setIsModalOpen(true);
-      },
-    },
-  });
 
   const { startISO, endISO } = useMemo(() => monthRange(cursorDate), [cursorDate]);
 
@@ -117,12 +138,10 @@ export default function ScheduleXMonthView() {
     const load = async () => {
       setLoading(true);
       setErr("");
-
       try {
         const res = await fetch(
           `${API_BASE_URL}/bookings2/range?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`
         );
-
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || "No pude cargar citas del rango");
 
