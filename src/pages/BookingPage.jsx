@@ -618,9 +618,9 @@ const StepForm = ({ bookingData, setBookingData, setStep, handleSubmit, isSendin
         <div className="relative">
           <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
           <input
-            required
+           
             type="email"
-            placeholder="ejemplo@correo.com"
+            placeholder="Sino tienes correo, dejalo vacío"
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all"
             value={bookingData.clientEmail}
             onChange={(e) => setBookingData({...bookingData, clientEmail: e.target.value})}
@@ -1014,8 +1014,8 @@ const handleDateTimeSelect = (selectedDate, time, dateISO) => {
 
     if (!bookingData.service?.id) throw new Error("Falta service_id.");
     if (!bookingData.time) throw new Error("Falta hora seleccionada.");
-    if (!bookingData.clientName || !bookingData.clientEmail || !bookingData.clientPhone) {
-      throw new Error("Completa nombre, correo y teléfono.");
+    if (!bookingData.clientName || !bookingData.clientPhone) {
+      throw new Error("Completa nombre y teléfono.");
     }
     if (typeof bookingData.start_min !== "number") {
        throw new Error("Falta start_min (selecciona una hora disponible).");
