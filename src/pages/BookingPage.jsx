@@ -211,10 +211,10 @@ const AiAssistantCard = ({
         <div>
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             <Sparkles className="text-purple-500" size={18} /> 
-            Asistente de Estilo IA
+            Pregúntale a tu asistente de Estilo IA
           </h3>
           <p className="text-xs text-gray-500 mt-1">
-            ¿Indecisa? Cuéntame para qué ocasión son tus uñas.
+            ¿No sabes que elegir? Cuéntame para qué ocasión son tus uñas.
           </p>
         </div>
         <button 
@@ -319,7 +319,7 @@ const StepServices = ({ mainServices, addOns, handleServiceSelect, showAiAssista
           onClick={() => setShowAiAssistant(true)}
           className="w-full mb-6 py-3 px-4 bg-gradient-to-r from-purple-500 to-rose-500 text-white rounded-xl font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
         >
-          <Sparkles size={18} /> ¿No sabes qué elegir? Pregúntale a la IA
+          <Sparkles size={18} /> ¿Estas indecisa con tu diseño? Pregúntale a la IA
         </button>
       )}
 
